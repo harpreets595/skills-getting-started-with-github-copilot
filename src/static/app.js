@@ -4,6 +4,33 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  // Function to show a custom confirmation modal
+  function showConfirmationModal(message, onConfirm) {
+    const modal = document.createElement("div");
+    modal.className = "confirmation-modal";
+
+    modal.innerHTML = `
+      <div class="modal-content">
+        <p>${message}</p>
+        <div class="modal-actions">
+          <button class="confirm-btn">Yes</button>
+          <button class="cancel-btn">No</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector(".confirm-btn").addEventListener("click", () => {
+      onConfirm();
+      document.body.removeChild(modal);
+    });
+
+    modal.querySelector(".cancel-btn").addEventListener("click", () => {
+      document.body.removeChild(modal);
+    });
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -20,9 +47,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
-        // Create participants list
+        // Create participants list with delete buttons
         const participantsList = details.participants
-          .map((participant) => `<li>${participant}</li>`)
+          .map(
+            (participant) => `
+              <li>
+                ${participant} 
+                <button class="delete-participant" data-activity="${name}" data-email="${participant}">Remove</button>
+              </li>
+            `
+          )
           .join("");
 
         activityCard.innerHTML = `
@@ -45,6 +79,34 @@ document.addEventListener("DOMContentLoaded", () => {
         option.value = name;
         option.textContent = name;
         activitySelect.appendChild(option);
+      });
+
+      // Add event listeners to delete buttons
+      document.querySelectorAll(".delete-participant").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+          const activity = button.dataset.activity;
+          const email = button.dataset.email;
+
+          // Show custom confirmation modal
+          showConfirmationModal(`Are you sure you want to remove ${email} from ${activity}?`, async () => {
+            try {
+              const response = await fetch(
+                `/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(email)}`,
+                {
+                  method: "POST",
+                }
+              );
+
+              if (response.ok) {
+                fetchActivities(); // Refresh activities list
+              } else {
+                console.error("Failed to remove participant");
+              }
+            } catch (error) {
+              console.error("Error removing participant:", error);
+            }
+          });
+        });
       });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
